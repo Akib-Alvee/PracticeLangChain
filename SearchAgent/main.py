@@ -17,7 +17,7 @@ load_dotenv()
 
 def main():
     tools = [TavilySearch()]
-    # llm = ChatOllama(temprature=0, model="gemma3:270m")
+    # llm = ChatOllama(temprature=0, model="llama3.2:latest")
     llm = ChatGoogleGenerativeAI(
         model="gemini-2.5-flash",
         temperature=0,
@@ -25,13 +25,14 @@ def main():
         timeout=None,
         max_retries=2,
     )
-    output_parser = PydanticOutputParser(pydantic_object=AgentResponse)
+    structured_llm = llm.with_structured_output(AgentResponse)
+    # output_parser = PydanticOutputParser(pydantic_object=AgentResponse)
     # react_prompt = hub.pull("hwchase17/react")
     react_prompt = PromptTemplate(
         template=REACT_PROMPT_WITH_FORMAT_INSTRUCTIONS,
         input_variables=["input", "agent_scratchpad", "tool_names"]
     ).partial(
-        format_instructions=output_parser.get_format_instructions()
+        format_instructions=""
     )
     agent = create_react_agent(
         llm=llm,
@@ -43,8 +44,8 @@ def main():
     )
     
     extract_output = RunnableLambda(lambda x: x["output"])
-    parse_output = RunnableLambda(lambda x: output_parser.parse(x))
-    chain = agent_executor | extract_output | parse_output
+    # parse_output = RunnableLambda(lambda x: output_parser.parse(x))
+    chain = agent_executor | extract_output | structured_llm
 
     result = chain.invoke(
         input={
